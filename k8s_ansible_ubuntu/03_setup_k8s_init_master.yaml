@@ -1,0 +1,100 @@
+---
+- hosts: masters
+  become: yes
+  gather_facts: yes
+  connection: ssh
+
+  vars_prompt:
+
+  - name: "pod_network_cidr"
+    prompt: "Enter the Pod Network CIDR, example: 10.10.0.0/16"
+    private: no
+
+  - name: "k8s_master_ip"
+    prompt: "Apiserver advertise address, eg: 192.168.0.26 or 172.31.10.91"
+    private: no
+
+  - name: "pod_network_manifest_file"
+    prompt: "Enter the Pod network manifest file URL example-> https://cloud.weave.works/k8s/net <copy paste the url>"
+    private: no
+
+  #  - name: "rbac_manifest_file"
+  #    prompt: "Enter the RBAC manifest file URL"
+  #    private: no 
+
+  tasks:
+  - name: st.03.1 Make the Swap inactive
+    command: swapoff -a
+
+  - name: st.03.2 Initilizing Kubernetes Cluster
+    command: sudo kubeadm init --apiserver-advertise-address "{{ k8s_master_ip }}"
+    run_once: true
+    # delegate_to: "{{ k8s_master_ip }}"
+
+  - pause: seconds=3
+
+
+  - name: st.03.2.1 Create directory for kube config.
+    file: 
+      path: /home/{{ansible_user }}/.kube
+      state: directory
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: 0755
+
+
+  - name: st.03.3 Copy /etc/kubernetes/admin.conf to user's home directory /home/{{ ansible_user }}/.kube/config.
+    copy:
+      src: /etc/kubernetes/admin.conf
+      dest: /home/{{ ansible_user }}/.kube/config
+      remote_src: yes
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: '0644'
+
+  - pause: seconds=3
+
+
+  - name: st.03.4 Remove the cache directory.
+    file: 
+      path: /home/{{ ansible_user }}/.kube/cache
+      state: absent
+
+
+  - name: Create Pod Network & RBAC.
+    become_user: ansadmin
+    become_method: sudo
+    become: yes
+    command: "{{ item }}"
+    with_items: 
+      - kubectl apply -f {{ pod_network_manifest_file }}
+
+
+  - pause: seconds=3
+
+
+  - name: st.03.6 Get the token for joining the nodes with Kuberentes master.
+    become_user: ansadmin
+    become_method: sudo
+    become: yes
+    shell: kubeadm token create  --print-join-command > /tmp/kubernetes_join_command.sh
+    register: kubernetes_join_command
+    tags: join_command
+
+
+  - fetch:
+      name: st.03.8 fetch join_command file from master node
+      src: /tmp/kubernetes_join_command.sh
+      dest: fetched/kubernetes_join_command.sh
+      flat: yes
+    tags: join_command
+      
+
+  - name: st.03.9 Configure kubectl command auto-completion.
+    lineinfile:
+      dest: /home/{{ ansible_user }}/.bashrc
+      line: 'source <(kubectl completion bash)'
+      insertafter: EOF
+    tags: join_command
+
+       

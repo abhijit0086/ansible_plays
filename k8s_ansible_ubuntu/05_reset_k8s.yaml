@@ -1,0 +1,23 @@
+---
+- name: reset k8s
+  hosts: k8s_cluster
+  become: yes
+
+  tasks:
+  - name: Step1- Copy file with owner and permission, using symbolic representation
+    copy:
+      src: ./files/00_reset_k8s.sh
+      dest: /tmp/00_reset_k8s.sh
+      owner: ansadmin
+      group: ansadmin
+      mode: u=rwx,g=r,o=r 
+
+  - name: Step2- run shellscript to reset k8s cluster.
+    shell: sh /tmp/00_reset_k8s.sh | tee /tmp/output_00_reset_k8s.txt
+
+
+  - fetch:
+      name: Step3- fetch consoleoutput file
+      src: /tmp/output_00_reset_k8s.txt
+      dest: ./fetched/output/{{ inventory_hostname }}/output_00_reset_k8s.txt
+      flat: yes

@@ -1,0 +1,70 @@
+---
+- hosts: "masters, workers"
+  become: yes
+  gather_facts: yes
+  connection: ssh
+  
+  tasks:
+    - name: st.02.1 Make the Swap inactive
+      command: swapoff -a
+
+    - name: st.02.2 Remove Swap entry from /etc/fstab.
+      lineinfile:
+        dest: /etc/fstab
+        regexp: swap
+        state: absent
+
+    - name: st.02.3 Installing Prerequisites for Kubernetes
+      apt: 
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg-agent
+          - vim
+          - software-properties-common
+        state: present
+
+    - name: st.02.4 Add Google official GPG key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+    - name: st.02.5 Add Kubernetes Repository
+      apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main 
+        state: present
+        filename: kubernetes
+        mode: 0600
+
+    - name: st.02.6 Installing Kubernetes Cluster Packages.
+      apt: 
+        name:
+          - kubeadm
+          - kubectl
+          - kubelet
+        state: present
+
+    - name: st.02.7 Enable service kubelet, and enable persistently
+      service: 
+        name: kubelet
+        enabled: yes
+
+    - name: step.02.8 Update kubernetes configuration, kubelet config change.
+      lineinfile:
+        path: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+        insertafter: 'Environment="*"'
+
+        #the line to add 
+        line: 'Environment=”cgroup-driver=systemd/cgroup-driver=cgroupfs”'
+
+        state: present
+        backup: yes
+
+
+    # - name: Reboot all the kubernetes nodes.
+    #   reboot:
+    #     post_reboot_delay: 10
+    #     reboot_timeout: 140
+    #     connect_timeout: 180
+    #     test_command: uptime

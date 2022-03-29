@@ -1,0 +1,32 @@
+---
+- hosts: masters
+  become: yes
+  
+  vars_prompt:
+  - name: "pod_network_manifest_file"
+    prompt: "Enter the Pod network manifest file URL, https://cloud.weave.works/k8s/net"
+    private: no
+
+  tasks:
+  - name: Create Pod Network & RBAC.
+    become_user: ansadmin
+    become_method: sudo
+    become: yes
+    command: "{{ item }}"
+    with_items: 
+      - kubectl apply -f {{ pod_network_manifest_file }}
+
+  
+  # - name: st.03.05.0 Copy weavenet file.
+  #   copy:
+  #     src: files/weavenet_network.sh
+  #     dest: /tmp/weavenet_network.sh
+  #     mode: 0777   
+
+  # - name: st.03.05.1 Join the Worker nodes with the master.
+  #   become: yes
+  #   shell: sh /tmp/weavenet_network.sh
+  #   register: joined_or_not
+
+  # - debug:
+  #     msg: "{{ joined_or_not.stdout }}"
