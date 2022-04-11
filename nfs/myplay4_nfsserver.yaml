@@ -1,0 +1,54 @@
+---
+- name: install nfsserver
+  hosts: nfs-server
+  become: yes
+
+  vars:
+    nfsclientip1: 172.31.15.30
+    nfsclientip1: 172.31.15.31
+
+  tasks:
+  - name: Step 1 - Update repositories cache and install "nfs-kernel-server" package
+    apt:
+      name: nfs-kernel-server
+      update_cache: yes
+
+  - name: Step 2 - Checking if the directory exists
+    stat:
+      path: "/mnt/nfs_share"
+    register: dir_data
+
+  - name: Step 2.1 - Create an NFS Export Directory
+    file:
+      path: /mnt/nfs_share
+      state: directory
+      owner: nobody
+      group: nogroup
+      mode: 0777
+      recurse: yes
+    when: not dir_data.stat.exists
+
+  - name: Step 3 - Create an NFS Export DirectoryGrant NFS Share Access to Client Systems
+    copy:
+      dest: "/etc/exports"
+      content: |
+        /mnt/nfs_share  192.168.168.168/24(rw,sync,no_subtree_check)
+
+  - name: Step 3.1 - update nfs clients ip /etc/exports 
+    lineinfile:
+      path: /etc/exports
+      line: "{{ item }}"
+      state: present
+      backup: yes
+    with_items:
+    - ' '
+    - '# aws client'
+    - '/mnt/nfs_share  {{nfsclientip1}}/24(rw,sync,no_subtree_check)'
+    # - '/mnt/nfs_share  {{nfsclientip2}}/24(rw,sync,no_subtree_check)'
+
+  - name: Step 4 - Export the NFS Share Directory
+    command: exportfs -a
+    
+
+  - name: Step 5 - restart NFS Share Directory
+    command: systemctl restart nfs-kernel-server

@@ -1,0 +1,41 @@
+---
+- name: install nfsclient
+  hosts: nfs-clients
+  become: yes
+
+  vars:
+    - nfsserverprivip: 172.31.12.120
+
+  tasks:
+  - name: Step 1- Install the NFS-Common Package
+    apt:
+      name: nfs-common
+      update_cache: yes
+
+  - name: Step 2 - Checking if the directory exists
+    stat:
+      path: "/mnt/nfs_clientshare"
+    register: nfs_clientshare
+
+  - name: Step 2.1- Create an NFS Export Directory
+    file:
+      path: "/mnt/nfs_clientshare"
+      state: directory
+      owner: nobody
+      group: nogroup
+      mode: 0777
+      recurse: yes
+    when: not nfs_clientshare.stat.exists
+
+  - name: step 3- Mount an NFS volume
+    ansible.posix.mount:
+      src: "{{nfsserverprivip}}:/mnt/nfs_share"
+      path: /mnt/nfs_clientshare
+      opts: rw,sync,hard,intr
+      state: mounted
+      fstype: nfs
+   
+  - name: Step 4- testing
+    command: touch /mnt/nfs_clientshare/file1.txt
+
+      

@@ -1,0 +1,53 @@
+---
+- name: install docker repo client
+  hosts: private-repo-client
+  become: yes
+
+  vars_prompt:
+  - name: "repo_ip"
+    prompt: "enter repo address, eg: 192.168.0.26 or 172.31.10.91"
+    private: no
+
+  vars:
+    - docker_repo_ip: "{{repo_ip}}"
+    - server_hostname: docker.private.repo
+    - private_key: domain.key
+    - csr: domain.csr
+    - certificate: domain.crt
+
+  tasks:
+    - name: step 1 - make directory for certs
+      file:
+        path: /etc/docker/certs.d/{{ server_hostname }}:5000
+        state: directory
+
+    - name: step 2 - copy private key to location
+      copy:
+        src: ./fetched/{{ certificate }}
+        dest: /etc/docker/certs.d/{{ server_hostname }}:5000/{{ certificate }}
+    
+    - name: Step 3 - update /etc/hosts for private repo
+      lineinfile:
+        path: /etc/hosts
+        line: "{{docker_repo_ip}}    {{ server_hostname }}"
+        state: present
+        backup: yes
+
+    - name: Step 4 - Install pip for new nodes
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Step 4.1 - install docker py
+      pip:
+        name: docker-py       
+
+
+    - name: Step 5 - pull any image from dockerhub for uploading to our docker.private.repo
+      community.docker.docker_image:
+        name: "{{ server_hostname }}:5000/hello-world:v1"
+        source: pull
+
+    - name: step 6 - verify pulled image
+      shell: sudo docker images
+

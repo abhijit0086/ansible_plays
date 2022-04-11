@@ -1,0 +1,100 @@
+---
+- hosts: "cpu-nodes, gpu-nodes"
+  become: yes
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - name: st.01.1 Add Docker’s official GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: st.01.2 Add Docker Repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+        state: present
+        filename: docker
+        mode: 0600
+
+    - name: st.01.3 Install Docker Engine.
+      apt: 
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: st.01.4 make required directory to store config files
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+
+
+- hosts: "cpu-nodes"
+  become: yes
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - name: st.01.01.1 updating daemon.json file (cpu nodes) at /etc/docker/daemon.json
+      copy:
+        dest: "/etc/docker/daemon.json"
+        content: |
+          {
+
+          "exec-opts": ["native.cgroupdriver=systemd"],
+          "log-driver": "json-file",
+          "log-opts": {
+            "max-size": "100m"
+          },
+          "storage-driver": "overlay2"
+          }
+
+    - name: st.01.01.2 Enable service docker, and enable persistently
+      service: 
+        name: docker
+        enabled: yes
+    
+    - name: st.01.01.3 Restart docker
+      service: 
+        name: docker
+        state: restarted
+    
+
+- hosts: "gpu-nodes"
+  become: yes
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - name: st.01.02.1 updating daemon.json files (gpu nodes)
+      copy:
+        dest: "/etc/docker/daemon.json"
+        content: |
+          {
+            "default-runtime": "nvidia",
+            "runtimes": { 
+                "nvidia": { 
+                    "path": "nvidia-container-runtime",
+                    "runtimeArgs": []
+                }
+            },
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "100m"
+            },
+            "storage-driver": "overlay2"
+          }
+    
+    - name: st.01.02.2 Enable service docker, and enable persistently
+      service: 
+        name: docker
+        enabled: yes
+
+    - name: st.01.02.3 Restart docker
+      service: 
+        name: docker
+        state: restarted
+

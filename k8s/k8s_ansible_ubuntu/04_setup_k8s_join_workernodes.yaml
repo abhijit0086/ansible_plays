@@ -1,0 +1,21 @@
+---
+- name: Joining worker nodes to master
+  hosts: workers
+  become: yes
+  gather_facts: yes
+  connection: ssh
+       
+  tasks:
+    - name: st.04.01 Copy join command to worker nodes.
+      copy:
+        src: fetched/kubernetes_join_command.sh
+        dest: /tmp/kubernetes_join_command.sh
+        mode: 0777   
+
+    - name: st.04.02 Join the Worker nodes with the master.
+      command: sh /tmp/kubernetes_join_command.sh
+      register: joined_or_not
+
+    - debug:
+        msg: "{{ joined_or_not.stdout }}"
+
